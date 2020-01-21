@@ -18,9 +18,6 @@ import io.flutter.view.TextureRegistry;
 
 public final class CameraPlugin implements FlutterPlugin, ActivityAware {
 
-  private final CameraPermissions cameraPermissions = new CameraPermissions();
-  private final Registrar registrar;
-  private Camera camera;
   private static final String TAG = "CameraPlugin";
   private @Nullable FlutterPluginBinding flutterPluginBinding;
   private @Nullable MethodCallHandlerImpl methodCallHandler;
@@ -30,12 +27,9 @@ public final class CameraPlugin implements FlutterPlugin, ActivityAware {
   public static void registerWith(Registrar registrar) {
     CameraPlugin plugin = new CameraPlugin();
 
-    plugin.maybeStartListening(
-        registrar.activity(),
-        registrar.messenger(),
-        registrar::addRequestPermissionsResultListener,
-        registrar.view()
-    );
+    plugin.maybeStartListening(registrar.activity(), registrar.messenger(),
+                               registrar::addRequestPermissionsResultListener,
+                               registrar.view());
   }
 
   @Override
@@ -69,7 +63,8 @@ public final class CameraPlugin implements FlutterPlugin, ActivityAware {
   }
 
   @Override
-  public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
+  public void onReattachedToActivityForConfigChanges(
+      @NonNull ActivityPluginBinding binding) {
     onAttachedToActivity(binding);
   }
 
@@ -78,17 +73,16 @@ public final class CameraPlugin implements FlutterPlugin, ActivityAware {
     onDetachedFromActivity();
   }
 
-  private void maybeStartListening(
-      Activity activity,
-      BinaryMessenger messenger,
-      PermissionsRegistry permissionsRegistry,
-      TextureRegistry textureRegistry) {
+  private void maybeStartListening(Activity activity, BinaryMessenger messenger,
+                                   PermissionsRegistry permissionsRegistry,
+                                   TextureRegistry textureRegistry) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-      // If the sdk is less than 21 (min sdk for Camera2) we don't register the plugin.
+      // If the sdk is less than 21 (min sdk for Camera2) we don't register the
+      // plugin.
       return;
     }
     methodCallHandler =
-        new MethodCallHandlerImpl(
-            activity, messenger, new CameraPermissions(), permissionsRegistry, textureRegistry);
+        new MethodCallHandlerImpl(activity, messenger, new CameraPermissions(),
+                                  permissionsRegistry, textureRegistry);
   }
 }
