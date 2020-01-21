@@ -1,5 +1,6 @@
 package io.flutter.plugins.camera;
 
+import android.content.pm.PackageManager;
 import android.app.Activity;
 import android.hardware.camera2.CameraAccessException;
 import androidx.annotation.NonNull;
@@ -39,6 +40,11 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
     methodChannel.setMethodCallHandler(this);
   }
 
+  private boolean hasFlash() {
+    return registrar.context().getApplicationContext().getPackageManager()
+        .hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
+  }
+
   @Override
   public void onMethodCall(@NonNull MethodCall call, @NonNull final Result result) {
     switch (call.method) {
@@ -74,7 +80,7 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
         }
       case "takePicture":
         {
-          camera.takePicture(call.argument("path"), result);
+          camera.takePicture(call.argument("path"), (Integer) call.argument("flashMode"), result);
           break;
         }
       case "prepareForVideoRecording":
@@ -165,6 +171,8 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
     String cameraName = call.argument("cameraName");
     String resolutionPreset = call.argument("resolutionPreset");
     boolean enableAudio = call.argument("enableAudio");
+    boolean autoInitializeFlash = call.argument("autoInitializeFlash");
+    boolean autoInitializeAutoExposure = call.argument("autoInitializeAutoExposure");
     TextureRegistry.SurfaceTextureEntry flutterSurfaceTexture =
         textureRegistry.createSurfaceTexture();
     DartMessenger dartMessenger = new DartMessenger(messenger, flutterSurfaceTexture.id());
@@ -175,7 +183,10 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
             dartMessenger,
             cameraName,
             resolutionPreset,
-            enableAudio);
+            enableAudio,
+            autoInitializeFlash,
+            autoInitializeAutoExposure
+        );
 
     camera.open(result);
   }

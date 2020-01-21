@@ -4,7 +4,6 @@
 
 package io.flutter.plugins.camera;
 
-import android.content.pm.PackageManager;
 import android.app.Activity;
 import android.os.Build;
 import androidx.annotation.NonNull;
@@ -20,9 +19,7 @@ import io.flutter.view.TextureRegistry;
 public final class CameraPlugin implements FlutterPlugin, ActivityAware {
 
   private final CameraPermissions cameraPermissions = new CameraPermissions();
-  private final FlutterView view;
   private final Registrar registrar;
-  private final EventChannel imageStreamChannel;
   private Camera camera;
   private static final String TAG = "CameraPlugin";
   private @Nullable FlutterPluginBinding flutterPluginBinding;
@@ -79,11 +76,6 @@ public final class CameraPlugin implements FlutterPlugin, ActivityAware {
   @Override
   public void onDetachedFromActivityForConfigChanges() {
     onDetachedFromActivity();
-  }
-
-  private boolean hasFlash() {
-    return registrar.context().getApplicationContext().getPackageManager()
-        .hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
   }
 
   private void maybeStartListening(
