@@ -7,27 +7,41 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import io.flutter.plugin.common.PluginRegistry;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
+import io.flutter.plugin.common.PluginRegistry.RequestPermissionsResultListener;
 
-public class CameraPermissions {
+final class CameraPermissions {
+  interface PermissionsRegistry {
+    void addListener(RequestPermissionsResultListener handler);
+  }
+
+  interface ResultCallback {
+    void onResult(String errorCode, String errorDescription);
+  }
+
   private static final int CAMERA_REQUEST_ID = 9796;
   private boolean ongoing = false;
 
-  public void requestPermissions(Registrar registrar, boolean enableAudio, ResultCallback callback) {
+  void requestPermissions(
+      Activity activity,
+      PermissionsRegistry permissionsRegistry,
+      boolean enableAudio,
+      ResultCallback callback) {
     if (ongoing) {
       callback.onResult("cameraPermission", "Camera permission request ongoing");
     }
-    Activity activity = registrar.activity();
     if (!hasCameraPermission(activity) || (enableAudio && !hasAudioPermission(activity))) {
-      registrar.addRequestPermissionsResultListener(
-          new CameraRequestPermissionsListener((String errorCode, String errorDescription) -> {
-            ongoing = false;
-            callback.onResult(errorCode, errorDescription);
-          }));
+      permissionsRegistry.addListener(
+          new CameraRequestPermissionsListener(
+              (String errorCode, String errorDescription) -> {
+                ongoing = false;
+                callback.onResult(errorCode, errorDescription);
+              }));
       ongoing = true;
-      ActivityCompat.requestPermissions(activity,
-          enableAudio ? new String[] { Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO }
-              : new String[] { Manifest.permission.CAMERA },
+      ActivityCompat.requestPermissions(
+          activity,
+          enableAudio
+              ? new String[] {Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO}
+              : new String[] {Manifest.permission.CAMERA},
           CAMERA_REQUEST_ID);
     } else {
       // Permissions already exist. Call the callback with success.
@@ -36,14 +50,18 @@ public class CameraPermissions {
   }
 
   private boolean hasCameraPermission(Activity activity) {
-    return ContextCompat.checkSelfPermission(activity, permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+    return ContextCompat.checkSelfPermission(activity, permission.CAMERA)
+        == PackageManager.PERMISSION_GRANTED;
   }
 
   private boolean hasAudioPermission(Activity activity) {
-    return ContextCompat.checkSelfPermission(activity, permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    return ContextCompat.checkSelfPermission(activity, permission.RECORD_AUDIO)
+        == PackageManager.PERMISSION_GRANTED;
   }
 
-  private static class CameraRequestPermissionsListener implements PluginRegistry.RequestPermissionsResultListener {
+  private static class CameraRequestPermissionsListener
+      implements PluginRegistry.RequestPermissionsResultListener {
+
     final ResultCallback callback;
 
     private CameraRequestPermissionsListener(ResultCallback callback) {
@@ -55,7 +73,8 @@ public class CameraPermissions {
       if (id == CAMERA_REQUEST_ID) {
         if (grantResults[0] != PackageManager.PERMISSION_GRANTED) {
           callback.onResult("cameraPermission", "MediaRecorderCamera permission not granted");
-        } else if (grantResults.length > 1 && grantResults[1] != PackageManager.PERMISSION_GRANTED) {
+        } else if (grantResults.length > 1
+            && grantResults[1] != PackageManager.PERMISSION_GRANTED) {
           callback.onResult("cameraPermission", "MediaRecorderAudio permission not granted");
         } else {
           callback.onResult(null, null);
@@ -64,9 +83,5 @@ public class CameraPermissions {
       }
       return false;
     }
-  }
-
-  interface ResultCallback {
-    void onResult(String errorCode, String errorDescription);
   }
 }
