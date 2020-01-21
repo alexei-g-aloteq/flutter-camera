@@ -41,8 +41,10 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
   }
 
   private boolean hasFlash() {
-    return registrar.context().getApplicationContext().getPackageManager()
-        .hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
+    return activity
+      .getApplicationContext()
+      .getPackageManager()
+      .hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
   }
 
   @Override
