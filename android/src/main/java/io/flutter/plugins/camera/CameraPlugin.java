@@ -15,6 +15,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
 import io.flutter.view.FlutterView;
+import io.flutter.view.TextureRegistry;
 
 public class CameraPlugin implements MethodCallHandler {
 
@@ -48,15 +49,24 @@ public class CameraPlugin implements MethodCallHandler {
   private void instantiateCamera(MethodCall call, Result result) throws CameraAccessException {
     String cameraName = call.argument("cameraName");
     String resolutionPreset = call.argument("resolutionPreset");
+
     boolean enableAudio = call.argument("enableAudio");
     boolean autoInitializeFlash = call.argument("autoInitializeFlash");
     boolean autoInitializeAutoExposure = call.argument("autoInitializeAutoExposure");
-    camera = new Camera(registrar.activity(), view, cameraName, resolutionPreset, enableAudio, autoInitializeFlash,
-        autoInitializeAutoExposure);
 
-    EventChannel cameraEventChannel = new EventChannel(registrar.messenger(),
-        "flutter.io/cameraPlugin/cameraEvents" + camera.getFlutterTexture().id());
-    camera.setupCameraEventChannel(cameraEventChannel);
+    TextureRegistry.SurfaceTextureEntry flutterSurfaceTexture = view.createSurfaceTexture();
+    DartMessenger dartMessenger = new DartMessenger(registrar.messenger(), flutterSurfaceTexture.id());
+
+    camera = new Camera(
+      registrar.activity(),
+      flutterSurfaceTexture,
+      dartMessenger,
+      cameraName,
+      resolutionPreset,
+      enableAudio,
+      autoInitializeFlash,
+      autoInitializeAutoExposure
+    );
 
     camera.open(result);
   }
