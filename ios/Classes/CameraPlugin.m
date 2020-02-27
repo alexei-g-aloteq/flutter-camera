@@ -211,6 +211,7 @@ static ResolutionPreset getResolutionPresetForString(NSString *preset) {
 @property(assign, nonatomic) CMTime audioTimeOffset;
 @property(nonatomic) CMMotionManager *motionManager;
 @property AVAssetWriterInputPixelBufferAdaptor *videoAdaptor;
+@property (nonatomic) BOOL isFlashModeEnabled;
 - (instancetype)initWithCameraName:(NSString *)cameraName
                   resolutionPreset:(NSString *)resolutionPreset
                        enableAudio:(BOOL)enableAudio
@@ -312,6 +313,8 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
 
 - (void)captureToFile:(NSString *)path result:(FlutterResult)result {
   AVCapturePhotoSettings *settings = [AVCapturePhotoSettings photoSettings];
+    AVCaptureFlashMode flashMode = self.isFlashModeEnabled ? AVCaptureFlashModeOn : AVCaptureFlashModeOff;
+    [settings setFlashMode:flashMode];
   if (_resolutionPreset == max) {
     [settings setHighResolutionPhotoEnabled:YES];
   }
@@ -744,26 +747,28 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
 }
 
 - (void)setFlashMode:(BOOL)enable {
+    //self.isFlashModeEnabled = enable;
   [self setFlashMode:enable level:1.0];
 }
 
 - (void)setFlashMode:(BOOL)enable level:(float)level {
-  AVCaptureDevice *device =
-      [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-  if ([device hasFlash] && [device hasFlash]) {
-    [device lockForConfiguration:nil];
-    if (enable) {
-      NSError *error = nil;
-      float acceptedLevel = (level < AVCaptureMaxAvailableTorchLevel
-                                 ? level
-                                 : AVCaptureMaxAvailableTorchLevel);
-      NSLog(@"FLash level: %f", acceptedLevel);
-      [device setTorchModeOnWithLevel:acceptedLevel error:&error];
-    } else {
-      [device setTorchMode:AVCaptureFlashModeOff];
-    }
-    [device unlockForConfiguration];
-  }
+    self.isFlashModeEnabled = enable;
+//  AVCaptureDevice *device =
+//      [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+//  if ([device hasFlash] && [device hasFlash]) {
+//    [device lockForConfiguration:nil];
+//    if (enable) {
+//      NSError *error = nil;
+//      float acceptedLevel = (level < AVCaptureMaxAvailableTorchLevel
+//                                 ? level
+//                                 : AVCaptureMaxAvailableTorchLevel);
+//      NSLog(@"FLash level: %f", acceptedLevel);
+//      [device setTorchModeOnWithLevel:acceptedLevel error:&error];
+//    } else {
+//      [device setTorchMode:AVCaptureFlashModeOff];
+//    }
+//    [device unlockForConfiguration];
+//  }
 }
 
 - (void)setAutoExposureMode:(BOOL)enable {
