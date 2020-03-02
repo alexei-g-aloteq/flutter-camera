@@ -16,13 +16,13 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.os.Build;
-import android.util.Log;
 import android.util.Size;
 import android.view.OrientationEventListener;
 import android.view.Surface;
@@ -209,7 +209,26 @@ public class Camera {
       }
     }
   }
+  private void lock() {
+    try {
+      previewBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
+              CameraMetadata.CONTROL_AE_PRECAPTURE_TRIGGER_START);
 
+      cameraCaptureSession.setRepeatingRequest(previewBuilder.build(), null, null);
+    } catch (CameraAccessException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void unlock() {
+    try {
+      previewBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
+              CameraMetadata.CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL);
+      cameraCaptureSession.setRepeatingRequest(previewBuilder.build(), null, null);
+    } catch (CameraAccessException e) {
+      e.printStackTrace();
+    }
+  }
   SurfaceTextureEntry getFlutterTexture() {
     return flutterTexture;
   }
@@ -234,56 +253,36 @@ public class Camera {
 
     try {
       final CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+      lock();
+      captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, captureBuilder.get(CaptureRequest.CONTROL_AF_MODE));
 
       captureBuilder.addTarget(pictureImageReader.getSurface());
       captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getMediaOrientation());
 
-      captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-      captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, previewBuilder.get(CaptureRequest.CONTROL_AF_MODE));
-      captureBuilder.set(CaptureRequest.FLASH_MODE, previewBuilder.get(CaptureRequest.FLASH_MODE));
-
-      // Log.d(TAG, "flashMode is: " + flashMode.toString());
-
-      // switch (flashMode) {
-      // // AUTO
-      // case CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH:
-      //   Log.d(TAG, "Preparing capture builder: CONTROL_AE_MODE_ON_AUTO_FLASH");
-      //   captureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-      //   break;
-
-      // // ON
-      // case CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH:
-      //   Log.d(TAG, "Preparing capture builder: CONTROL_AE_MODE_ON_ALWAYS_FLASH");
-      //   captureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
-      //   break;
-
-      // // OFF
-      // default:
-      //   Log.d(TAG, "Preparing capture builder: OFF/DEFAULT");
-      //   captureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
-      //   break;
-      // }
-
-      // Log.d(TAG, "LOADED CAMERA CONFIGURATION:");
-      // Log.d(TAG, "-- CONTROL_AE_MODE: " + captureBuilder.get(CaptureRequest.CONTROL_AE_MODE));
-      // Log.d(TAG, "-- CONTROL_AF_MODE: " + captureBuilder.get(CaptureRequest.CONTROL_AF_MODE));
-
-      cameraCaptureSession.stopRepeating();
 
       cameraCaptureSession.capture(captureBuilder.build(), new CameraCaptureSession.CaptureCallback() {
         @Override
-        public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request,
-            @NonNull CaptureFailure failure) {
+        public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+          unlock();
+
+          super.onCaptureCompleted(session, request, result);
+        }
+
+        @Override
+        public void onCaptureFailed(
+                @NonNull CameraCaptureSession session,
+                @NonNull CaptureRequest request,
+                @NonNull CaptureFailure failure) {
           String reason;
           switch (failure.getReason()) {
-          case CaptureFailure.REASON_ERROR:
-            reason = "An error happened in the framework";
-            break;
-          case CaptureFailure.REASON_FLUSHED:
-            reason = "The capture has failed due to an abortCaptures() call";
-            break;
-          default:
-            reason = "Unknown reason";
+            case CaptureFailure.REASON_ERROR:
+              reason = "An error happened in the framework";
+              break;
+            case CaptureFailure.REASON_FLUSHED:
+              reason = "The capture has failed due to an abortCaptures() call";
+              break;
+            default:
+              reason = "Unknown reason";
           }
           result.error("captureFailure", reason, null);
         }
@@ -337,7 +336,10 @@ public class Camera {
             return;
           }
           cameraCaptureSession = session;
-          previewBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+          previewBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
+          previewBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                  CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+
           cameraCaptureSession.setRepeatingRequest(previewBuilder.build(), null, null);
           if (onSuccessCallback != null) {
             onSuccessCallback.run();
@@ -360,6 +362,7 @@ public class Camera {
     // Start the session
     cameraDevice.createCaptureSession(surfaceList, callback, null);
   }
+
 
   public void startVideoRecording(String filePath, Result result) {
     if (new File(filePath).exists()) {
@@ -493,12 +496,13 @@ public class Camera {
 
   public void setFlashMode(@NonNull final Result result, boolean enable, double level) {
     try {
-      previewBuilder.set(CaptureRequest.FLASH_MODE,
-          enable ? CaptureRequest.FLASH_MODE_TORCH : CaptureRequest.FLASH_MODE_OFF);
-
-      previewBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
-          CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_START);
-
+      if(enable){
+        previewBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+        previewBuilder.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_SINGLE);
+      } else {
+        previewBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
+        previewBuilder.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_OFF);
+      }
       cameraCaptureSession.setRepeatingRequest(previewBuilder.build(), null, null);
       result.success(null);
     } catch (Exception e) {
@@ -509,10 +513,10 @@ public class Camera {
   public void setAutoExposureMode(@NonNull final Result result, boolean enable) {
     try {
       // Request Auto Exposure mode
-      previewBuilder.set(CaptureRequest.CONTROL_AE_MODE,
-          enable ? CaptureRequest.CONTROL_AE_MODE_ON : CaptureRequest.CONTROL_AE_MODE_OFF);
-
-      cameraCaptureSession.setRepeatingRequest(previewBuilder.build(), null, null);
+//      previewBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+//          enable ? CaptureRequest.CONTROL_AE_MODE_ON : CaptureRequest.CONTROL_AE_MODE_OFF);
+//
+//      cameraCaptureSession.setRepeatingRequest(previewBuilder.build(), null, null);
       result.success(null);
     } catch (Exception e) {
       result.error("cameraAutoExposureFailed", e.getMessage(), null);
